@@ -1,0 +1,73 @@
+# 출시 — 공개 거울 developedby-dev/sdk-kotlin (ADR-0050). 원천은 모노레포 sdks/kotlin/.github/workflows/release.yml — 거울에서 고치지 않는다.
+# 판 태그(v1.0.0)를 밀면 시험하고, 환경 release에서 대표가 승인한 뒤 PGP로 서명한 꾸러미를 Central Portal에 올린다(USER_MANAGED — Portal에서 대표가
+# 「Publish」를 한 번 더 눌러야 공개된다). Maven Central은 OIDC 신뢰 게시가 없어 이 저장소만 환경 release의 비밀 넷을 쓴다(대표가 넣는다):
+# MAVEN_GPG_PRIVATE_KEY(ASCII 갑옷) · MAVEN_GPG_PASSPHRASE · MAVEN_CENTRAL_USERNAME · MAVEN_CENTRAL_PASSWORD(Portal 사용자 토큰).
+# 올린 jar에는 GitHub 증명을 남긴다. 손으로 돌리면(workflow_dispatch) 시험 · 짓기만 한다
+name: release
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: ./gradlew --no-daemon --console=plain ktfmtCheck test build
+  publish:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: 태그와 꾸러미 판이 같은지
+        env:
+          TAG: ${{ github.ref_name }}
+        run: grep -qx "version = \"${TAG#v}\"" build.gradle.kts
+      - name: 서명해 짓기 (build/staging-deploy)
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: ./gradlew --no-daemon --console=plain publish
+      - name: 묶음 (POM · 소스 · javadoc · 체크섬 · 서명)
+        run: |
+          test -n "$(find build/staging-deploy -name '*.jar.asc' -print -quit)"
+          (cd build/staging-deploy && zip -qr ../central-bundle.zip dev)
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: build/staging-deploy/**/*.jar
+      - name: Central Portal에 올리기 (USER_MANAGED)
+        env:
+          PORTAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          PORTAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          token=$(printf '%s:%s' "$PORTAL_USERNAME" "$PORTAL_PASSWORD" | base64 -w0)
+          curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            --form bundle=@build/central-bundle.zip \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED"
