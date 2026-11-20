@@ -1,6 +1,7 @@
 package dev.developedby.sdk
 
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -20,13 +21,27 @@ private class FakeOs(override val name: String, var answers: Map<String, Any> = 
     val files = HashMap<String, String>()
     val tools = HashSet<String>()
 
+    val slept = ArrayList<Long>()
+
     override fun exec(program: String, args: List<String>, stdin: String?): String {
         calls.add(Call(program, args, stdin))
-        return when (val a = answers["$program ${args.first()}"] ?: answers[program]) {
+        val key =
+            if (answers.containsKey("$program ${args.first()}")) "$program ${args.first()}"
+            else program
+        var a = answers[key]
+        if (a is List<*>) { // 차례로 — 마지막 값을 되풀이
+            if (a.size > 1) answers = answers + (key to a.drop(1))
+            a = a.first()
+        }
+        return when (a) {
             is Exception -> throw a
             is String -> a
             else -> ""
         }
+    }
+
+    override fun sleep(millis: Long) {
+        slept.add(millis)
     }
 
     override fun has(program: String): Boolean = program in tools
@@ -84,6 +99,27 @@ class PlatformTest {
                 files["/var/lib/dbus/machine-id"] = "0123456789abcdef0123456789abcdef\n"
             }
         assertEquals("0123456789abcdef0123456789abcdef", OsFingerprint(null, linux).read())
+    }
+
+    /** 1.2.0 — 2026-11-20 Windows에서 MachineGuid 읽기가 한 번 실패해 설치 ID로 등록됐다(같은 PC가 다른 기기) */
+    @Test
+    fun fingerprintRetriesBeforeInstallId() {
+        val guid = "    MachineGuid    REG_SZ    3f1e9a2b-1111-2222-3333-444455556666\r\n"
+        val win = FakeOs("windows", mapOf("reg" to listOf(IOException("잠시 실패"), "", guid)))
+        assertEquals(
+            "3f1e9a2b-1111-2222-3333-444455556666",
+            OsFingerprint("/app/install-id", win).read(),
+        )
+        assertTrue(win.files.isEmpty(), "설치 ID를 만들지 않는다")
+        assertEquals(3, win.calls.size)
+        val delay = Rules.FINGERPRINT_SOURCE_READ_RETRY_DELAY_MS.toLong()
+        assertEquals(listOf(delay, delay), win.slept)
+        val failing = FakeOs("windows", mapOf("reg" to IOException("계속 실패")))
+        assertEquals(
+            "00000000-0000-4000-8000-00000000abcd",
+            OsFingerprint("/app/install-id", failing).read(),
+        )
+        assertEquals(Rules.FINGERPRINT_SOURCE_READ_ATTEMPTS, failing.calls.size)
     }
 
     @Test

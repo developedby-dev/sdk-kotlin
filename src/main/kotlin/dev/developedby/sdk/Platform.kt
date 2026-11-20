@@ -28,6 +28,9 @@ internal interface Os {
     fun remove(path: String)
 
     fun newId(): String
+
+    /** 지문 출처를 다시 읽기 전 기다림(명세 10절) — 단위 시험은 기다리지 않게 바꿔 끼운다 */
+    fun sleep(millis: Long) = Thread.sleep(millis)
 }
 
 /** 명령이 0이 아닌 코드로 끝났다. [stderr]는 그 명령의 오류 출력이다 */
@@ -218,14 +221,18 @@ public object OsPorts {
 
 internal class OsFingerprint(private val installIdFile: String?, private val os: Os) :
     FingerprintSource {
+    /** 실패하거나 빈 값이면 설치 ID로 물러나기 전에 다시 읽는다(명세 10절) — 일시적인 실패 하나로 같은 PC가 다른 기기가 되지 않게. */
     override fun read(): String? {
-        runCatching { machineId() }
-            .getOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let {
-                return it
-            }
+        repeat(maxOf(Rules.FINGERPRINT_SOURCE_READ_ATTEMPTS, 1)) { attempt ->
+            if (attempt > 0) os.sleep(Rules.FINGERPRINT_SOURCE_READ_RETRY_DELAY_MS.toLong())
+            runCatching { machineId() }
+                .getOrNull()
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let {
+                    return it
+                }
+        }
         val file = installIdFile ?: return null
         os.readFile(file)
             ?.trim()

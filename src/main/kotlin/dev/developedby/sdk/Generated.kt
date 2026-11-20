@@ -6,7 +6,7 @@ package dev.developedby.sdk
 
 /** 이 SDK가 따르는 동작 명세 판. */
 public object Spec {
-    public const val VERSION: String = "1.1.1"
+    public const val VERSION: String = "1.2.0"
     public const val DEVICE_CODE_GRANT_TYPE: String = "urn:ietf:params:oauth:grant-type:device_code"
 }
 
@@ -243,7 +243,7 @@ public object Routes {
 
 /** 규칙 (sdks/spec/rules.json). */
 public object Rules {
-    public const val SPEC_VERSION: String = "1.1.1"
+    public const val SPEC_VERSION: String = "1.2.0"
     public const val API: String = "v1"
     @JvmField
     public val USER_AGENT_LANGUAGES: List<String> = listOf("typescript", "dotnet", "swift", "kotlin", "python", "go", "rust", "c")
@@ -265,6 +265,8 @@ public object Rules {
     public const val FINGERPRINT_ALGORITHM: String = "SHA-256"
     public const val FINGERPRINT_SALT: String = "bydev-device-v1"
     public const val FINGERPRINT_ENCODING: String = "hex-lower"
+    public const val FINGERPRINT_SOURCE_READ_ATTEMPTS: Int = 3
+    public const val FINGERPRINT_SOURCE_READ_RETRY_DELAY_MS: Int = 300
     public const val STORAGE_SERVICE: String = "dev.developedby.sdk"
     public const val STORAGE_RECORD_VERSION: Int = 1
     @JvmField

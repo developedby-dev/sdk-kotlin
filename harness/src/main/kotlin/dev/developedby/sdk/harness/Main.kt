@@ -59,6 +59,8 @@ private object H {
     var failLoad = false
     var failSave = false
     var failClear = false
+    /** set fingerprint.fail — 지문 출처를 읽지 못한다(하네스 규약 2절) */
+    var failFingerprint = false
     var client: LicenseClient? = null
     var login: LoginAttempt? = null
 
@@ -213,7 +215,7 @@ private class HarnessPorts(private val fingerprintValue: String?) :
         )
     }
 
-    override fun read(): String? = fingerprintValue
+    override fun read(): String? = if (H.failFingerprint) null else fingerprintValue
 
     override fun debug(message: String) {}
 
@@ -489,6 +491,7 @@ public fun main() {
                         "storage.failLoad" -> H.failLoad = value
                         "storage.failSave" -> H.failSave = value
                         "storage.failClear" -> H.failClear = value
+                        "fingerprint.fail" -> H.failFingerprint = value
                     }
                 }
                 settle()

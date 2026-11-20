@@ -199,6 +199,8 @@ internal constructor(
     private var heartbeat: Cancel? = null
     private var offline: Cancel? = null
     private var fallback: String? = null
+    /** 처음 계산한 지문 해시 — 한 실행 동안 다시 쓴다(명세 10절). 획득마다 다시 읽으면 일시적인 읽기 실패 하나로 다른 기기가 된다 */
+    private var fingerprint: String? = null
 
     private fun cancelTimers() {
         heartbeat?.cancel()
@@ -341,6 +343,17 @@ internal constructor(
     }
 
     private fun fingerprintHash(): String {
+        synchronized(lock) { fingerprint }
+            ?.let {
+                return it
+            }
+        val computed = computeFingerprintHash()
+        return synchronized(lock) {
+            fingerprint ?: computed.also { fingerprint = it }
+        } // 동시에 계산했으면 먼저 정한 값
+    }
+
+    private fun computeFingerprintHash(): String {
         val ports = api.ports
         val source = runCatching {
             ports.fingerprint.read()
