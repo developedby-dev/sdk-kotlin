@@ -59,7 +59,7 @@ publishing {
             pom {
                 name.set("bydev SDK")
                 description.set(
-                    "bydev 라이선스 API 공식 Kotlin/Java SDK — 디바이스 로그인 · 토큰 회전 · 세션 리스 · licenseToken 검증 · 업데이트 확인"
+                    "데브 라이선스 API 공식 Kotlin/Java SDK — 디바이스 로그인 · 토큰 회전 · 세션 리스 · licenseToken 검증 · 업데이트 확인"
                 )
                 url.set("https://developedby.dev/sell/docs")
                 licenses {

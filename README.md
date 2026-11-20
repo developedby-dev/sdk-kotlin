@@ -10,7 +10,7 @@ HTTP는 `java.net.http`, Ed25519는 JDK 기능을 쓰고, JSON은 SDK가 직접 
 
 | 지원 | 버전 |
 |---|---|
-| 동작 명세 | 1.1.0 |
+| 동작 명세 | 1.1.1 |
 | API | v1 |
 | JVM | Java 17 이상(Kotlin 2.4, Java 모두) |
 | 운영체제 | Windows, macOS, Linux |

@@ -61,16 +61,19 @@ internal constructor(
     private val isSettled: Boolean
         get() = synchronized(lock) { settled }
 
-    /** 폴링 지터는 위로만(interval보다 이르면 SLOW_DOWN이다). */
-    internal fun schedulePoll() {
+    /** 폴링 지터는 위로만(interval보다 이르면 SLOW_DOWN이다). 429면 [retryAfterSec]보다 이르게 묻지 않는다(명세 5절). */
+    internal fun schedulePoll(retryAfterSec: Int = 0) {
         val ports = api.ports
         val every = synchronized(lock) { interval }
         val delay =
-            jittered(
-                ports.random,
-                every.coerceAtLeast(0) * 1000,
-                Rules.LOGIN_POLL_JITTER_MIN,
-                Rules.LOGIN_POLL_JITTER_MAX,
+            maxOf(
+                jittered(
+                    ports.random,
+                    every.coerceAtLeast(0) * 1000,
+                    Rules.LOGIN_POLL_JITTER_MIN,
+                    Rules.LOGIN_POLL_JITTER_MAX,
+                ),
+                retryAfterSec * 1000L,
             )
         if (ports.clock.nowMs() + delay > expiresAtMs) {
             finish(Result.failure(BydevException(Codes.EXPIRED_TOKEN, "로그인 코드가 만료됐다 — 처음부터 다시")))
@@ -111,7 +114,13 @@ internal constructor(
         }
         val error = BydevException.wrap(e, Codes.NETWORK_ERROR, "API에 연결하지 못했다")
         when {
-            error.code == Codes.AUTHORIZATION_PENDING || error.isTransient -> schedulePoll()
+            error.code == Codes.AUTHORIZATION_PENDING -> schedulePoll()
+            error.isTransient ->
+                schedulePoll(
+                    if (error.code == Codes.RATE_LIMITED || error.httpStatus == 429)
+                        error.retryAfterSec ?: 0
+                    else 0
+                )
             error.code == Codes.SLOW_DOWN -> {
                 synchronized(lock) {
                     val n = error.retryAfterSec
