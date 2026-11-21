@@ -25,7 +25,7 @@ public class LicenseClient(private val config: Config) {
 
     public companion object {
         /** User-Agent(`bydev-kotlin/<판>`)에 실린다. */
-        public const val SDK_VERSION: String = "0.1.0"
+        public const val SDK_VERSION: String = "1.0.0"
         internal const val USER_AGENT: String = "bydev-kotlin/$SDK_VERSION"
     }
 

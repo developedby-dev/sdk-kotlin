@@ -15,10 +15,8 @@ HTTP는 `java.net.http`, Ed25519는 JDK 기능을 쓰고, JSON은 SDK가 직접 
 | JVM | Java 17 이상(Kotlin 2.4, Java 모두) |
 | 운영체제 | Windows, macOS, Linux |
 
-Maven 좌표는 `dev.developedby:bydev-sdk`이고, 패키지는 `dev.developedby.sdk`입니다. Maven Central 출시는 서비스 오픈을 준비할 때 합니다.
-
-그 전에는
-이 저장소 안에서만 쓸 수 있습니다.
+Maven 좌표는 `dev.developedby:bydev-sdk`이고, 패키지는 `dev.developedby.sdk`입니다. Maven Central에서 받습니다
+(Gradle `implementation("dev.developedby:bydev-sdk:1.0.0")`).
 
 ## 빠른 시작 (Kotlin)
 
